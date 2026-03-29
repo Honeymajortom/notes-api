@@ -62,8 +62,8 @@ jobs:
           script: |
             cd ~/notes-api
             git pull origin main
-            docker-compose down
-            docker-compose up -d --build
+            docker compose down
+            docker compose up -d --build
             sleep 5
             curl -f http://localhost:3000/health || exit 1
             echo "✅ Deployment successful"
