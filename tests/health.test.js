@@ -1,15 +1,14 @@
 const request = require('supertest');
-const app = require('../../src/app');
-const { pool } = require('../../src/config/db');
 
 describe('GET /health', () => {
 
-  afterAll(async () => {
-    // Close DB pool after tests so Jest exits cleanly
-    await pool.end();
+  afterEach(() => {
+    jest.resetModules();
+    jest.restoreAllMocks();
   });
 
   it('should return 200 with status ok when DB is connected', async () => {
+    const app = require('../src/app');
     const res = await request(app).get('/health');
 
     expect(res.statusCode).toBe(200);
@@ -21,6 +20,7 @@ describe('GET /health', () => {
   });
 
   it('should return numeric uptime', async () => {
+    const app = require('../src/app');
     const res = await request(app).get('/health');
 
     expect(typeof res.body.uptime).toBe('number');
@@ -28,6 +28,7 @@ describe('GET /health', () => {
   });
 
   it('should return a valid ISO timestamp', async () => {
+    const app = require('../src/app');
     const res = await request(app).get('/health');
 
     const parsed = new Date(res.body.timestamp);
@@ -35,11 +36,13 @@ describe('GET /health', () => {
   });
 
   it('should return 503 with db disconnected when DB is unreachable', async () => {
-    // Temporarily break the DB connection
-    const { testConnection } = require('../../src/config/db');
-    jest.spyOn(require('../../src/config/db'), 'testConnection')
-      .mockRejectedValueOnce(new Error('connection refused'));
+    // Mock the db module BEFORE requiring app
+    jest.mock('../src/config/db', () => ({
+      pool: { end: jest.fn() },
+      testConnection: jest.fn().mockRejectedValue(new Error('connection refused')),
+    }));
 
+    const app = require('../src/app');
     const res = await request(app).get('/health');
 
     expect(res.statusCode).toBe(503);
@@ -49,14 +52,11 @@ describe('GET /health', () => {
   });
 
   it('should respond without any auth header', async () => {
-    // /health must be publicly accessible — no token required
-    const res = await request(app)
-      .get('/health')
-      // deliberately no Authorization header
-    
+    const app = require('../src/app');
+    const res = await request(app).get('/health');
+
     expect(res.statusCode).not.toBe(401);
     expect(res.statusCode).not.toBe(403);
   });
 
 });
-
